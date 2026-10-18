@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package product;
+
+// Hợp đồng giao tiếp nội bộ (gRPC Proto Contract) cho Product Catalog Bounded Context
+service ProductService {
+  // Kiểm tra tồn kho và khấu trừ số lượng sản phẩm nguyên tử khi Order Service tạo đơn hàng
+  rpc CheckAndDeductStock (StockCheckRequest) returns (StockCheckResponse);
+
+  // Truy vấn thông tin chi tiết sản phẩm theo pid
+  rpc GetProductById (ProductRequest) returns (ProductResponse);
+}
+
+message OrderItemInput {
+  int32 pid = 1;
+  int32 qty = 2;
+}
+
+message StockCheckRequest {
+  repeated OrderItemInput items = 1;
+}
+
+message ReservedProductItem {
+  int32 pid = 1;
+  string pname = 2;
+  double unit_price = 3;
+  int32 qty = 4;
+}
+
+message StockCheckResponse {
+  bool success = 1;
+  repeated ReservedProductItem items = 2;
+}
+
+message ProductRequest {
+  int32 pid = 1;
+}
+
+message ProductResponse {
+  int32 pid = 1;
+  string pname = 2;
+  double price = 3;
+  int32 quantity = 4;
+}
+

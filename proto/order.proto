@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package order;
+
+// Hợp đồng dữ liệu (Proto Contract) cho Order Management & Sự kiện bất đồng bộ qua Kafka
+service OrderService {
+  rpc CreateOrder (CreateOrderRequest) returns (CreateOrderResponse);
+  rpc GetOrder (GetOrderRequest) returns (OrderResponse);
+}
+
+message OrderItem {
+  int32 pid = 1;
+  string pname = 2;
+  double unit_price = 3;
+  int32 qty = 4;
+}
+
+message CreateOrderRequest {
+  int32 uid = 1;
+  repeated OrderItem items = 2;
+}
+
+message CreateOrderResponse {
+  int32 oid = 1;
+  int32 uid = 2;
+  double subtotal = 3;
+  double discount = 4;
+  double totalamount = 5;
+  repeated OrderItem items = 6;
+}
+
+message GetOrderRequest {
+  int32 oid = 1;
+}
+
+message OrderResponse {
+  int32 oid = 1;
+  int32 uid = 2;
+  double discount = 3;
+  string createat = 4;
+  repeated OrderItem items = 5;
+}
+
+// Payload sự kiện OrderCreated phát lên Kafka topic "orders.created" sang Shipment Service
+message OrderCreatedEvent {
+  int32 oid = 1;
+  int32 uid = 2;
+  double discount = 3;
+  repeated OrderItem items = 4;
+  string timestamp = 5;
+}
+

@@ -1,0 +1,200 @@
+services:
+  # =========================================================================
+  # 1. INFRASTRUCTURE SERVICES (POLYGLOT PERSISTENCE & BROKER)
+  # =========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: p3-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - p3_postgres_data:/var/lib/postgresql/data
+      - ./init-postgres.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  mongodb:
+    image: mongo:latest
+    container_name: p3-mongodb
+    restart: always
+    ports:
+      - "27018:27017"
+    volumes:
+      - p3_mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  redis:
+    image: redis:7-alpine
+    container_name: p3-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - p3_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: p3-zookeeper
+    restart: always
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: p3-kafka
+    restart: always
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+  # =========================================================================
+  # 2. MICROSERVICES & API GATEWAY APPLICATION CONTAINERS
+  # =========================================================================
+  auth-service:
+    build: .
+    container_name: p3-auth-service
+    restart: always
+    command: ["node", "services/auth-service/server.js"]
+    ports:
+      - "5001:5001"
+    environment:
+      PORT_AUTH: 5001
+      AUTH_DB_URL: postgresql://postgres:postgres@postgres:5432/auth_db
+      CUSTOMER_SERVICE_URL: http://customer-service:5002
+      JWT_SECRET: super_secret_jwt_microservices_2026
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  customer-service:
+    build: .
+    container_name: p3-customer-service
+    restart: always
+    command: ["node", "services/customer-service/server.js"]
+    ports:
+      - "5002:5002"
+    environment:
+      PORT_CUSTOMER: 5002
+      CUSTOMER_DB_URL: postgresql://postgres:postgres@postgres:5432/customer_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  product-service:
+    build: .
+    container_name: p3-product-service
+    restart: always
+    command: ["node", "services/product-service/server.js"]
+    ports:
+      - "5003:5003"
+    environment:
+      PORT_PRODUCT: 5003
+      PRODUCT_MONGO_URI: mongodb://mongodb:27017/product_db
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  order-service:
+    build: .
+    container_name: p3-order-service
+    restart: always
+    command: ["node", "services/order-service/server.js"]
+    ports:
+      - "5004:5004"
+    environment:
+      PORT_ORDER: 5004
+      ORDER_DB_URL: postgresql://postgres:postgres@postgres:5432/order_db
+      CUSTOMER_SERVICE_URL: http://customer-service:5002
+      PRODUCT_SERVICE_URL: http://product-service:5003
+      KAFKA_BROKER: kafka:29092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  shipment-service:
+    build: .
+    container_name: p3-shipment-service
+    restart: always
+    command: ["node", "services/shipment-service/server.js"]
+    ports:
+      - "5005:5005"
+    environment:
+      PORT_SHIPMENT: 5005
+      SHIPMENT_MONGO_URI: mongodb://mongodb:27017/shipment_db
+      KAFKA_BROKER: kafka:29092
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  api-gateway:
+    build: .
+    container_name: p3-api-gateway
+    restart: always
+    command: ["node", "gateway/server.js"]
+    ports:
+      - "8080:8080"
+    environment:
+      PORT_GATEWAY: 8080
+      JWT_SECRET: super_secret_jwt_microservices_2026
+      REDIS_URL: redis://redis:6379
+      AUTH_SERVICE_URL: http://auth-service:5001
+      CUSTOMER_SERVICE_URL: http://customer-service:5002
+      PRODUCT_SERVICE_URL: http://product-service:5003
+      ORDER_SERVICE_URL: http://order-service:5004
+      SHIPMENT_SERVICE_URL: http://shipment-service:5005
+    depends_on:
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      customer-service:
+        condition: service_started
+      product-service:
+        condition: service_started
+      order-service:
+        condition: service_started
+      shipment-service:
+        condition: service_started
+
+volumes:
+  p3_postgres_data:
+  p3_mongo_data:
+  p3_redis_data:

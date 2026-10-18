@@ -1,0 +1,25 @@
+{
+  "name": "ecommerce-microservices",
+  "version": "1.0.0",
+  "description": "E-Commerce Microservices Architecture (DDD & Database-per-Service)",
+  "private": true,
+  "scripts": {
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "start": "node start-all.js",
+    "test:gateway": "node test/test-gateway.js",
+    "test:all": "node test/test-25-cases.js",
+    "test": "node test/test-25-cases.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "ioredis": "^5.4.2",
+    "jsonwebtoken": "^9.0.2",
+    "kafkajs": "^2.2.4",
+    "mongodb": "^6.12.0",
+    "pg": "^8.13.1"
+  }
+}

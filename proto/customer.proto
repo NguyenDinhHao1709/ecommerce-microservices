@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package customer;
+
+// Hợp đồng giao tiếp nội bộ (gRPC Proto Contract) cho Customer & Membership Bounded Context
+service CustomerService {
+  // Lấy thông tin khách hàng và điểm thành viên (score) để tính discount khi đặt hàng
+  rpc GetCustomerScore (CustomerRequest) returns (CustomerScoreResponse);
+
+  // Đồng bộ hồ sơ khách hàng mới khi đăng ký từ Identity & Access Service (auth-service)
+  rpc SyncCustomer (SyncCustomerRequest) returns (SyncCustomerResponse);
+}
+
+message CustomerRequest {
+  int32 uid = 1;
+}
+
+message CustomerScoreResponse {
+  int32 uid = 1;
+  string fullname = 2;
+  int32 mid = 3;
+  string mname = 4;
+  int32 score = 5;
+}
+
+message SyncCustomerRequest {
+  int32 uid = 1;
+  string fullname = 2;
+  int32 mid = 3;
+}
+
+message SyncCustomerResponse {
+  string message = 1;
+  int32 uid = 2;
+}
+
